@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>环华骑行路线图 · 136 天</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #app { display: flex; height: 100vh; }
+  #map { flex: 1; position: relative; }
+  #side {
+    width: 360px;
+    background: #1f2330;
+    color: #e7e9ee;
+    overflow-y: auto;
+    border-left: 1px solid #2a2f3d;
+  }
+  #side header {
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    color: #fff;
+    position: sticky; top: 0; z-index: 2;
+  }
+  #side header h1 { margin: 0 0 4px; font-size: 18px; letter-spacing: 1px; }
+  #side header p { margin: 0; font-size: 12px; opacity: .9; }
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    padding: 12px 14px; background: #262b39; border-bottom: 1px solid #2a2f3d;
+  }
+  .stat { text-align: center; }
+  .stat .num { font-size: 18px; font-weight: 700; color: #ffb454; }
+  .stat .lbl { font-size: 11px; opacity: .7; }
+  .legend { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid #2a2f3d; }
+  .legend span { display:inline-flex; align-items:center; margin-right: 12px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li {
+    padding: 10px 14px;
+    border-bottom: 1px solid #2a2f3d;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .15s;
+  }
+  ul.list li:hover { background: #2a3040; }
+  ul.list li.active { background: #3a2818; border-left: 3px solid #ffb454; }
+  ul.list li .day { color: #ffb454; font-weight: 600; margin-right: 6px; }
+  ul.list li .route { color: #e7e9ee; }
+  ul.list li .meta { display:block; color:#7d8395; font-size: 11px; margin-top: 2px; }
+  .leaflet-popup-content { font-size: 13px; line-height: 1.6; }
+  .day-badge {
+    background:#ff6b35; color:#fff; padding:1px 6px; border-radius:3px;
+    font-size: 11px; margin-right: 4px;
+  }
+  /* circle marker number labels（亮色底图增强可读性）*/
+  .num-label {
+    background: transparent; border: none; color: #fff;
+    font-size: 11px; font-weight: 700; text-align: center;
+    cursor: pointer;
+    text-shadow:
+      -1px -1px 0 #c0392b, 1px -1px 0 #c0392b,
+      -1px  1px 0 #c0392b, 1px  1px 0 #c0392b,
+       0   -1px 0 #c0392b, 0    1px 0 #c0392b,
+      -1px  0   0 #c0392b, 1px  0   0 #c0392b;
+  }
+  .leaflet-interactive { cursor: pointer; }
+  /* 富 popup 样式 */
+  .pop {
+    min-width: 240px; font-family: inherit;
+  }
+  .pop .title { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .pop .title b { font-size: 15px; }
+  .pop .meta-row { font-size: 12px; color:#666; margin: 2px 0; }
+  .pop .meta-row b { color: #ff5722; }
+  .pop .note {
+    background:#fff5ed; color:#8a4a2b; padding:6px 8px; border-radius:4px;
+    font-size: 12px; margin: 6px 0; line-height:1.5;
+  }
+  .pop .actions {
+    display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px;
+  }
+  .pop .actions a, .pop .actions button {
+    display:block; text-align:center; padding:6px 8px; border-radius:4px;
+    font-size: 12px; text-decoration:none; cursor:pointer; border:none;
+    background:#f0f2f5; color:#333; transition: all .15s;
+  }
+  .pop .actions a:hover, .pop .actions button:hover {
+    background:#ff6b35; color:#fff;
+  }
+  .pop .nav-row {
+    display:flex; justify-content: space-between; margin-top:8px;
+    border-top:1px solid #eee; padding-top:6px;
+  }
+  .pop .nav-row button {
+    background:none; border:none; cursor:pointer; color:#ff6b35;
+    font-size: 12px; padding: 2px 4px;
+  }
+  .pop .nav-row button:disabled { color:#ccc; cursor:not-allowed; }
+  .pop .nav-row button:hover:not(:disabled) { text-decoration: underline; }
+  .leaflet-popup-content { margin: 10px 12px; }
+  .leaflet-popup-content-wrapper { border-radius: 8px; }
+
+  /* 活动节点（事件）相关 */
+  .event-marker {
+    background: transparent; border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .event-marker .pin {
+    width: 36px; height: 36px; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+    border: 2px solid #fff;
+    transition: transform .15s;
+  }
+  .event-marker:hover .pin { transform: rotate(-45deg) scale(1.15); }
+  .event-marker .emoji {
+    transform: rotate(45deg);
+    font-size: 18px;
+  }
+
+  /* 侧边栏分区切换 */
+  .tabs {
+    display: flex; background: #262b39; border-bottom: 1px solid #2a2f3d;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .tabs .tab {
+    flex: 1; text-align: center; padding: 10px 0;
+    font-size: 13px; cursor: pointer; color: #9aa0b0;
+    border-bottom: 2px solid transparent;
+  }
+  .tabs .tab.active {
+    color: #ffb454; border-bottom-color: #ffb454;
+    background: #1f2330;
+  }
+
+  /* 事件列表 */
+  .event-toolbar {
+    padding: 10px 14px; display: flex; gap: 6px;
+    border-bottom: 1px solid #2a2f3d;
+  }
+  .event-toolbar button {
+    flex: 1; padding: 7px 0; border: none; border-radius: 4px;
+    background: #ff6b35; color: #fff; cursor: pointer; font-size: 12px;
+    transition: background .15s;
+  }
+  .event-toolbar button:hover { background: #ff8551; }
+  .event-toolbar button.secondary {
+    background: #2a3040; color: #cfd2db;
+  }
+  .event-toolbar button.secondary:hover { background: #3a4254; }
+
+  ul.events { list-style: none; margin: 0; padding: 0; }
+  ul.events li {
+    padding: 10px 14px; border-bottom: 1px solid #2a2f3d;
+    cursor: pointer; transition: background .15s;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  ul.events li:hover { background: #2a3040; }
+  ul.events li.active { background: #3a2818; border-left: 3px solid #ffb454; }
+  ul.events li .ev-emoji { font-size: 22px; flex-shrink: 0; }
+  ul.events li .ev-body { flex: 1; min-width: 0; }
+  ul.events li .ev-name {
+    color: #ffb454; font-weight: 600; font-size: 13px; margin-bottom: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  ul.events li .ev-tag {
+    font-size: 10px; padding: 1px 5px; border-radius: 3px;
+    background: rgba(255,180,84,0.2); color: #ffb454;
+  }
+  ul.events li .ev-when { font-size: 11px; color: #9aa0b0; }
+  ul.events li .ev-loc { font-size: 11px; color: #7d8395; margin-top: 1px; }
+  ul.events li .ev-desc { font-size: 11px; color: #b8bdc8; margin-top: 4px; line-height: 1.4; }
+  ul.events li .ev-actions {
+    display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+  }
+  ul.events li .ev-actions button {
+    border: none; background: transparent; color: #7d8395;
+    cursor: pointer; padding: 2px 4px; font-size: 12px;
+  }
+  ul.events li .ev-actions button:hover { color: #ffb454; }
+
+  /* 编辑器弹窗 */
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 10px; width: 420px; max-width: 92vw;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .modal h2 {
+    margin: 0; padding: 14px 18px;
+    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    color: #fff; font-size: 15px; border-radius: 10px 10px 0 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal h2 .close-btn {
+    background: rgba(255,255,255,0.25); color: #fff;
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    font-size: 18px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .modal h2 .close-btn:hover {
+    background: #fff; color: #ff5722; transform: rotate(90deg);
+  }
+  .modal .body { padding: 14px 18px; }
+  .modal .field { margin-bottom: 10px; }
+  .modal label {
+    display: block; font-size: 12px; color: #555;
+    margin-bottom: 4px; font-weight: 500;
+  }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; padding: 7px 10px; border: 1px solid #ddd;
+    border-radius: 4px; font-size: 13px; box-sizing: border-box;
+    font-family: inherit;
+  }
+  .modal input:focus, .modal select:focus, .modal textarea:focus {
+    outline: none; border-color: #ff6b35;
+  }
+  .modal .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modal .hint { font-size: 11px; color: #999; margin-top: 4px; }
+  .modal .pick-on-map {
+    background: #fff5ed; color: #ff6b35; padding: 6px 10px;
+    border: 1px dashed #ff6b35; border-radius: 4px;
+    cursor: pointer; font-size: 12px; text-align: center;
+    margin-top: 4px;
+  }
+  .modal .pick-on-map.active {
+    background: #ff6b35; color: #fff; border-style: solid;
+  }
+  .modal .footer {
+    padding: 10px 18px; border-top: 1px solid #eee;
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+  .modal .footer button {
+    padding: 7px 16px; border-radius: 4px; border: none;
+    cursor: pointer; font-size: 13px;
+  }
+  .modal .footer .cancel { background: #f0f0f0; color: #555; }
+  .modal .footer .save { background: #ff6b35; color: #fff; }
+  .modal .footer .save:hover { background: #ff5722; }
+  .modal .footer .delete { background: #e74c3c; color: #fff; margin-right: auto; }
+
+  /* emoji 选择器 */
+  .emoji-picker {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
+    padding: 6px; border: 1px solid #ddd; border-radius: 4px;
+    margin-top: 4px;
+  }
+  .emoji-picker span {
+    cursor: pointer; text-align: center; padding: 4px;
+    border-radius: 3px; font-size: 18px;
+  }
+  .emoji-picker span:hover { background: #f0f0f0; }
+  .emoji-picker span.selected { background: #ffe4d3; }
+
+  /* 颜色选择器 */
+  .color-picker { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .color-picker span {
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px #ddd;
+  }
+  .color-picker span.selected { box-shadow: 0 0 0 2px #333; }
+
+  /* "在地图上点击" 提示 */
+  .map-pick-banner {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: #ff6b35; color: #fff; padding: 8px 16px;
+    border-radius: 20px; font-size: 13px; z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none;
+  }
+  .map-pick-banner.show { display: block; }
+  #map.picking { cursor: crosshair !important; }
+  #map.picking * { cursor: crosshair !important; }
+  @media (max-width: 768px) {
+    #app { flex-direction: column; }
+    #side { width: 100%; height: 45%; }
+    #map { height: 55%; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map">
+    <div id="pickBanner" class="map-pick-banner">📍 请在地图上点击选择活动地点（按 Esc 取消）</div>
+  </div>
+  <aside id="side">
+    <header>
+      <h1>🛵 环华骑行 136 天路线图</h1>
+      <p>深圳出发 · 顺时针环游中国 · 全程约 3 万公里 · 中文地图</p>
+    </header>
+    <div class="stats">
+      <div class="stat"><div class="num">136</div><div class="lbl">骑行天数</div></div>
+      <div class="stat"><div class="num">~30000</div><div class="lbl">总里程 (km)</div></div>
+      <div class="stat"><div class="num">100+</div><div class="lbl">城市节点</div></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="route">🛵 骑行路线</div>
+      <div class="tab" data-tab="event">🎉 活动节点 <span id="evCount" style="opacity:.7"></span></div>
+    </div>
+
+    <!-- 路线 tab -->
+    <div id="tab-route">
+      <div class="legend">
+        <span><i style="background:#ff6b35"></i>普通节点</span>
+        <span><i style="background:#ffb454"></i>休整点</span>
+        <span><i style="background:#e74c3c"></i>起/终点</span>
+      </div>
+      <ul id="list" class="list"></ul>
+    </div>
+
+    <!-- 活动 tab -->
+    <div id="tab-event" style="display:none">
+      <div class="event-toolbar">
+        <button id="addEventBtn">➕ 新增活动</button>
+        <button class="secondary" id="exportEventBtn" title="导出为JSON">⬇ 导出</button>
+        <button class="secondary" id="importEventBtn" title="从JSON导入">⬆ 导入</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" />
+      </div>
+      <ul id="eventList" class="events"></ul>
+    </div>
+  </aside>
+</div>
+
+<!-- 活动编辑器弹窗 -->
+<div id="modalMask" class="modal-mask">
+  <div class="modal">
+    <h2>
+      <span id="modalTitle">新增活动节点</span>
+      <button type="button" class="close-btn" id="modalCloseX" title="关闭 (Esc)">✕</button>
+    </h2>
+    <div class="body">
+      <div class="field">
+        <label>活动名称 *</label>
+        <input id="evName" type="text" placeholder="例如：双十一开门红直播" maxlength="40" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>活动日期 *</label>
+          <input id="evDate" type="date" />
+        </div>
+        <div class="field">
+          <label>活动类型</label>
+          <select id="evType">
+            <option value="电商节">电商节</option>
+            <option value="开幕仪式">开幕仪式</option>
+            <option value="打卡">极地打卡</option>
+            <option value="直播">直播带货</option>
+            <option value="线下活动">线下活动</option>
+            <option value="收官仪式">收官仪式</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>活动地点 *</label>
+        <input id="evLocation" type="text" placeholder="例如：北京天安门 / 深圳出发地" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>纬度</label>
+          <input id="evLat" type="number" step="0.0001" placeholder="22.5431" />
+        </div>
+        <div class="field">
+          <label>经度</label>
+          <input id="evLng" type="number" step="0.0001" placeholder="114.0579" />
+        </div>
+      </div>
+      <div class="pick-on-map" id="pickOnMap">📍 在地图上点击选位</div>
+      <div class="field" style="margin-top:10px">
+        <label>图标 emoji</label>
+        <div class="emoji-picker" id="emojiPicker"></div>
+        <input id="evEmoji" type="hidden" />
+      </div>
+      <div class="field">
+        <label>主题色</label>
+        <div class="color-picker" id="colorPicker"></div>
+        <input id="evColor" type="hidden" />
+      </div>
+      <div class="field">
+        <label>活动描述</label>
+        <textarea id="evDesc" rows="3" placeholder="活动玩法、带货商品、预期目标等"></textarea>
+      </div>
+      <div class="field">
+        <label>关联链接（可选）</label>
+        <input id="evLink" type="url" placeholder="https://..." />
+        <div class="hint">直播间 / 落地页 / 抖音视频等</div>
+      </div>
+    </div>
+    <div class="footer">
+      <button class="delete" id="modalDeleteBtn" style="display:none">删除</button>
+      <button class="cancel" id="modalCancelBtn">取消</button>
+      <button class="save" id="modalSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// 路线节点（按时间顺序）。坐标为 [纬度, 经度]
+const route = [
+  { day:"出发", name:"深圳", coord:[22.5431,114.0579], dist:0, note:"起点 · 出发仪式", type:"start" },
+  { day:"第1天", name:"肇庆", coord:[23.0476,112.4683], dist:200, note:"全程321国道，实测续航" },
+  { day:"第2天", name:"梧州藤县", coord:[23.3759,110.9163], dist:220, note:"延321国道，360跟拍" },
+  { day:"第3天", name:"北海", coord:[21.4733,109.1191], dist:320, note:"过玉林到北海银滩", rest:true },
+  { day:"第4天", name:"防城港", coord:[21.6864,108.3454], dist:150, note:"过钦州三娘湾，怪石滩" },
+  { day:"第5天", name:"崇左", coord:[22.4042,107.3537], dist:220, note:"延516国道" },
+  { day:"第6-7天", name:"百色", coord:[23.9020,106.6160], dist:300, note:"古龙山大峡谷 · 通灵峡谷", rest:true },
+  { day:"第8天", name:"文山", coord:[23.3697,104.2447], dist:400, note:"测试爬坡续航" },
+  { day:"第9天", name:"红河县", coord:[23.3700,102.4205], dist:300, note:"马帮侨乡森林公园" },
+  { day:"第10-11天", name:"普洱", coord:[22.7777,100.9728], dist:320, note:"延213国道，休整两天", rest:true },
+  { day:"第12天", name:"临沧", coord:[23.8865,100.0866], dist:300, note:"延315国道" },
+  { day:"第13-14天", name:"大理", coord:[25.6065,100.2675], dist:300, note:"大理古城 · 洱海", rest:true },
+  { day:"第15天", name:"丽江", coord:[26.8721,100.2330], dist:160, note:"丽江古城 · 玉龙雪山" },
+  { day:"第16天", name:"迪庆(香格里拉)", coord:[27.8268,99.7065], dist:180, note:"梅里雪山 · 金沙江" },
+  { day:"第17-18天", name:"德钦", coord:[28.4865,98.9120], dist:170, note:"测试高原爬坡续航" },
+  { day:"第19-20天", name:"芒康", coord:[29.6796,98.5938], dist:240, note:"延澜沧江，正式入藏" },
+  { day:"第21天", name:"如美镇", coord:[29.6900,98.2300], dist:100, note:"正式进入318" },
+  { day:"第22天", name:"左贡", coord:[29.6717,97.8417], dist:110, note:"东达山垭口" },
+  { day:"第23天", name:"八宿", coord:[30.0530,96.9180], dist:200, note:"锂电充电教程讲解" },
+  { day:"第24-25天", name:"然乌湖", coord:[29.5000,96.7500], dist:100, note:"雪山高路风景", rest:true },
+  { day:"第26天", name:"波密", coord:[29.8590,95.7708], dist:150, note:"波密雪山" },
+  { day:"第27天", name:"墨脱", coord:[29.3261,95.3325], dist:120, note:"墨脱公路" },
+  { day:"第28天", name:"米林", coord:[29.2153,94.2156], dist:200, note:"雅鲁藏布江峡谷" },
+  { day:"第29-30天", name:"曲松", coord:[29.0640,92.2050], dist:350, note:"延219国道，休整一天", rest:true },
+  { day:"第31天", name:"贡嘎", coord:[29.2944,90.9893], dist:150, note:"贡嘎机场 · 雪山" },
+  { day:"第32-35天", name:"拉萨", coord:[29.6520,91.1721], dist:100, note:"布达拉宫 · 休整3-5天", rest:true },
+  { day:"第36天", name:"日喀则", coord:[29.2670,88.8809], dist:270, note:"向珠峰进发" },
+  { day:"第37-38天", name:"珠峰大本营", coord:[28.0270,86.8556], dist:340, note:"小哈锂电到达珠峰", rest:true },
+  { day:"第39天", name:"吉隆", coord:[28.8536,85.2978], dist:300, note:"延朋曲一路前行" },
+  { day:"第40天", name:"萨嘎", coord:[29.3290,85.2353], dist:100, note:"准备穿越阿里" },
+  { day:"第41天", name:"仲巴", coord:[29.6841,84.0298], dist:200, note:"当却布藏湖" },
+  { day:"第42-45天", name:"普兰", coord:[30.2980,81.1779], dist:400, note:"开始穿越阿里地区", rest:true },
+  { day:"第46-47天", name:"狮泉河", coord:[32.5025,80.1054], dist:350, note:"冈仁波齐朝圣", rest:true },
+  { day:"第48天", name:"日土", coord:[33.3866,79.7148], dist:120, note:"班公湖观景台" },
+  { day:"第49天", name:"甜水海", coord:[35.4000,79.5500], dist:350, note:"无人区骑行" },
+  { day:"第50天", name:"大红柳滩", coord:[35.7500,79.0000], dist:120, note:"荒漠风景" },
+  { day:"第51-53天", name:"皮山赛图拉", coord:[36.5000,78.6000], dist:120, note:"穿越阿里圆满成功", rest:true },
+  { day:"第54天", name:"杏花镇", coord:[37.7000,77.4000], dist:300, note:"坡陇原始森林" },
+  { day:"第55天", name:"泽普", coord:[38.1854,77.2698], dist:100, note:"延219国道" },
+  { day:"第56天", name:"英吉沙", coord:[38.9302,76.1764], dist:150, note:"延219国道" },
+  { day:"第57天", name:"喀什", coord:[39.4677,75.9890], dist:100, note:"体验当地风土人情" },
+  { day:"第58天", name:"巴楚", coord:[39.7857,78.5491], dist:260, note:"延315国道" },
+  { day:"第59天", name:"阿瓦提", coord:[40.6394,80.3818], dist:210, note:"延315国道" },
+  { day:"第60-61天", name:"新和", coord:[41.5500,82.6105], dist:280, note:"骑行2个月感受 · 休整", rest:true },
+  { day:"第62天", name:"铁门关", coord:[41.8000,86.0000], dist:300, note:"延库东公路" },
+  { day:"第63天", name:"和静", coord:[42.3216,86.3925], dist:150, note:"延314国道" },
+  { day:"第64-66天", name:"乌鲁木齐", coord:[43.8256,87.6168], dist:410, note:"挑战日骑400公里 · 休整3天", rest:true },
+  { day:"第67天", name:"吐鲁番", coord:[42.9476,89.1841], dist:220, note:"火焰山景区" },
+  { day:"第68天", name:"哈密", coord:[42.8332,93.5151], dist:400, note:"延328国道" },
+  { day:"第69-70天", name:"敦煌", coord:[40.1421,94.6614], dist:400, note:"月牙泉打卡", rest:true },
+  { day:"第71天", name:"酒泉", coord:[39.7320,98.5108], dist:400, note:"瓜州补电" },
+  { day:"第72天", name:"张掖", coord:[38.9326,100.4554], dist:220, note:"七彩丹霞" },
+  { day:"第73天", name:"武威", coord:[37.9283,102.6342], dist:250, note:"抓喜秀龙草原" },
+  { day:"第74天", name:"中卫", coord:[37.5145,105.1896], dist:270, note:"延338国道" },
+  { day:"第75天", name:"银川", coord:[38.4872,106.2309], dist:170, note:"森林公园 · 草原骑马" },
+  { day:"第76天", name:"乌海", coord:[39.6736,106.7949], dist:160, note:"打卡成吉思汗" },
+  { day:"第77天", name:"巴彦淖尔", coord:[40.7430,107.3879], dist:150, note:"延110国道" },
+  { day:"第78-80天", name:"包头", coord:[40.6580,109.8403], dist:250, note:"赛汗塔拉草原 · 休整两天", rest:true },
+  { day:"第81天", name:"呼和浩特", coord:[40.8414,111.7519], dist:180, note:"敕勒川草原" },
+  { day:"第82天", name:"正镶白旗", coord:[42.3000,115.0000], dist:380, note:"草原天路" },
+  { day:"第83天", name:"赤峰", coord:[42.2752,118.9569], dist:400, note:"延510国道" },
+  { day:"第84-86天", name:"通辽", coord:[43.6175,122.2630], dist:380, note:"内蒙骑行收官 · 休整两天", rest:true },
+  { day:"第87天", name:"松原", coord:[45.1410,124.8232], dist:320, note:"准备进黑龙江" },
+  { day:"第88天", name:"齐齐哈尔", coord:[47.3543,123.9182], dist:300, note:"抵达最北方" },
+  { day:"第89天", name:"绥化", coord:[46.6373,126.9886], dist:300, note:"延309国道" },
+  { day:"第90天", name:"鹤岗", coord:[47.3499,130.2978], dist:300, note:"日常骑行" },
+  { day:"第91天", name:"鸡西", coord:[45.3001,130.9750], dist:300, note:"虎头旅游景区" },
+  { day:"第92天", name:"牡丹江", coord:[44.5520,129.6328], dist:200, note:"延201国道" },
+  { day:"第93天", name:"龙井", coord:[42.7665,129.4231], dist:200, note:"延宁马乡道" },
+  { day:"第94-95天", name:"抚松", coord:[42.3417,127.2845], dist:240, note:"朝鲜边境 · 行程过半", rest:true },
+  { day:"第96天", name:"通化", coord:[41.7211,125.9395], dist:180, note:"长白山国家森林公园" },
+  { day:"第97天", name:"凤城", coord:[40.4524,124.0710], dist:280, note:"延201国道" },
+  { day:"第98-100天", name:"大连", coord:[38.9140,121.6147], dist:320, note:"渔人码头 · 休整两天", rest:true },
+  { day:"第101天", name:"大石桥", coord:[40.6446,122.5063], dist:230, note:"延国道骑行" },
+  { day:"第102天", name:"锦州", coord:[41.1196,121.1351], dist:160, note:"延305国道" },
+  { day:"第103天", name:"秦皇岛", coord:[39.9354,119.6005], dist:210, note:"仙螺岛 · 港口" },
+  { day:"第104-106天", name:"北京", coord:[39.9042,116.4074], dist:300, note:"天安门打卡 · 休整两天", rest:true },
+  { day:"第107天", name:"天津", coord:[39.0842,117.2008], dist:130, note:"延京津公路" },
+  { day:"第108天", name:"东营", coord:[37.4346,118.6747], dist:260, note:"延236省道" },
+  { day:"第109天", name:"平度", coord:[36.7866,119.9850], dist:200, note:"延309省道" },
+  { day:"第110-112天", name:"威海", coord:[37.5128,122.1207], dist:230, note:"布鲁威斯号搁浅巨轮 · 休整", rest:true },
+  { day:"第113天", name:"青岛", coord:[36.0671,120.3826], dist:260, note:"海军博物馆" },
+  { day:"第114天", name:"连云港", coord:[34.5967,119.2216], dist:280, note:"延220省道" },
+  { day:"第115天", name:"盐城", coord:[33.3776,120.1399], dist:180, note:"高速实测续航" },
+  { day:"第116天", name:"南通", coord:[31.9802,120.8551], dist:200, note:"延204国道" },
+  { day:"第117-119天", name:"上海", coord:[31.2304,121.4737], dist:150, note:"东方明珠 · 陆家嘴", rest:true },
+  { day:"第120天", name:"杭州", coord:[30.2741,120.1551], dist:180, note:"跑两天闪购外卖" },
+  { day:"第121天", name:"宁波", coord:[29.8683,121.5440], dist:160, note:"舟山群岛打卡" },
+  { day:"第122天", name:"温岭", coord:[28.3713,121.3859], dist:210, note:"延316国道" },
+  { day:"第123-125天", name:"宁德", coord:[26.6656,119.5482], dist:400, note:"宁德时代打卡 · 休整两天", rest:true },
+  { day:"第126天", name:"莆田", coord:[25.4310,119.0078], dist:220, note:"延324国道" },
+  { day:"第127天", name:"厦门", coord:[24.4798,118.0894], dist:180, note:"跑一天厦门外卖" },
+  { day:"第128天", name:"漳浦", coord:[24.1170,117.6147], dist:110, note:"延324国道" },
+  { day:"第129-132天", name:"南澳岛", coord:[23.4225,117.0240], dist:170, note:"环南澳岛 · 休整两天", rest:true },
+  { day:"第133天", name:"揭阳", coord:[23.5498,116.3729], dist:100, note:"日常骑行" },
+  { day:"第134天", name:"汕尾", coord:[22.7864,115.3753], dist:200, note:"延324国道" },
+  { day:"第135天", name:"平海(惠州双月湾)", coord:[22.6328,114.7588], dist:100, note:"双月湾打卡" },
+  { day:"第136天", name:"深圳(终点)", coord:[22.5431,114.0579], dist:120, note:"环华圆满成功", type:"end" }
+];
+
+// ========== WGS84 -> GCJ02 坐标转换（高德/腾讯地图使用 GCJ02 火星坐标） ==========
+function wgs84ToGcj02(lat, lng) {
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  const outOfChina = (lng < 72.004 || lng > 137.8347) || (lat < 0.8293 || lat > 55.8271);
+  if (outOfChina) return [lat, lng];
+  let dLat = transformLat(lng - 105.0, lat - 35.0);
+  let dLng = transformLng(lng - 105.0, lat - 35.0);
+  const radLat = lat / 180.0 * Math.PI;
+  let magic = Math.sin(radLat); magic = 1 - ee * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+  dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+  return [lat + dLat, lng + dLng];
+}
+function transformLat(x, y) {
+  let r = -100 + 2*x + 3*y + 0.2*y*y + 0.1*x*y + 0.2*Math.sqrt(Math.abs(x));
+  r += (20*Math.sin(6*x*Math.PI) + 20*Math.sin(2*x*Math.PI)) * 2/3;
+  r += (20*Math.sin(y*Math.PI) + 40*Math.sin(y/3*Math.PI)) * 2/3;
+  r += (160*Math.sin(y/12*Math.PI) + 320*Math.sin(y*Math.PI/30.0)) * 2/3;
+  return r;
+}
+function transformLng(x, y) {
+  let r = 300 + x + 2*y + 0.1*x*x + 0.1*x*y + 0.1*Math.sqrt(Math.abs(x));
+  r += (20*Math.sin(6*x*Math.PI) + 20*Math.sin(2*x*Math.PI)) * 2/3;
+  r += (20*Math.sin(x*Math.PI) + 40*Math.sin(x/3*Math.PI)) * 2/3;
+  r += (150*Math.sin(x/12*Math.PI) + 300*Math.sin(x/30.0*Math.PI)) * 2/3;
+  return r;
+}
+// 把所有节点的 WGS84 坐标转成 GCJ02，确保和高德底图对齐
+route.forEach(r => { r.coord = wgs84ToGcj02(r.coord[0], r.coord[1]); });
+
+// 初始化地图，中心点设在中国中部
+const map = L.map('map', { zoomControl: true }).setView([35, 103], 5);
+
+// 使用高德中文地图（带中文路名/城市名）
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+  subdomains: '1234',
+  attribution: '高德地图 © AutoNavi',
+  maxZoom: 18
+}).addTo(map);
+
+// 计算总里程
+let total = 0; route.forEach(r => total += r.dist);
+document.querySelector('.stats .stat:nth-child(2) .num').textContent = total.toLocaleString();
+document.querySelector('.stats .stat:nth-child(3) .num').textContent = route.length;
+
+// 绘制连线（先画白色描边，再画橙色主线，亮色底图上更清晰）
+const latlngs = route.map(r => r.coord);
+L.polyline(latlngs, {
+  color: '#ffffff', weight: 6, opacity: 0.9, lineJoin: 'round'
+}).addTo(map);
+L.polyline(latlngs, {
+  color: '#ff5722',
+  weight: 3.5,
+  opacity: 1,
+  dashArray: '6,4',
+  lineJoin: 'round'
+}).addTo(map);
+
+// 标记点
+const markers = [];
+const numberLabels = [];
+
+// 富 popup 内容生成器
+function buildPopupHtml(r, i) {
+  const prev = i > 0 ? route[i-1] : null;
+  const next = i < route.length - 1 ? route[i+1] : null;
+  const [lat, lng] = r.coord;
+  const amapUrl = `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent(r.name)}&src=huanhuaride&coordinate=gaode`;
+  const naviUrl = `https://uri.amap.com/navigation?to=${lng},${lat},${encodeURIComponent(r.name)}&mode=car&coordinate=gaode`;
+  const douyinUrl = `https://www.douyin.com/search/${encodeURIComponent(r.name + ' 骑行')}`;
+  const baikeUrl = `https://baike.baidu.com/item/${encodeURIComponent(r.name)}`;
+
+  let typeLabel = '途径点';
+  if (r.rest) typeLabel = '🏨 休整点';
+  if (r.type === 'start') typeLabel = '🚩 起点';
+  if (r.type === 'end') typeLabel = '🏁 终点';
+
+  return `
+    <div class="pop">
+      <div class="title">
+        <span class="day-badge">${r.day}</span>
+        <b>${r.name}</b>
+        <span style="color:#999;font-size:11px;margin-left:auto">#${i}</span>
+      </div>
+      <div class="meta-row">类型：${typeLabel}</div>
+      <div class="meta-row">单段里程：<b>${r.dist} km</b></div>
+      ${prev ? `<div class="meta-row">上一站：${prev.name}</div>` : ''}
+      ${next ? `<div class="meta-row">下一站：${next.name}（${next.dist} km）</div>` : ''}
+      <div class="note">${r.note}</div>
+      <div class="actions">
+        <a href="${amapUrl}" target="_blank" rel="noopener">🗺 高德查看</a>
+        <a href="${naviUrl}" target="_blank" rel="noopener">🚗 路线导航</a>
+        <a href="${douyinUrl}" target="_blank" rel="noopener">▶ 抖音视频</a>
+        <a href="${baikeUrl}" target="_blank" rel="noopener">📖 百科介绍</a>
+      </div>
+      <div class="actions" style="margin-top:6px">
+        <button onclick="copyCoord(${lat},${lng})">📋 复制坐标</button>
+        <button onclick="zoomTo(${i}, 11)">🔍 放大到此</button>
+      </div>
+      <div class="nav-row">
+        <button ${prev ? `onclick="goTo(${i-1})"` : 'disabled'}>◀ 上一站</button>
+        <button onclick="zoomTo(${i}, 8)">居中</button>
+        <button ${next ? `onclick="goTo(${i+1})"` : 'disabled'}>下一站 ▶</button>
+      </div>
+    </div>
+  `;
+}
+
+route.forEach((r, i) => {
+  let color = '#ff6b35';
+  let size = 8;
+  if (r.rest) { color = '#ffb454'; size = 11; }
+  if (r.type === 'start' || r.type === 'end') { color = '#e74c3c'; size = 14; }
+
+  const marker = L.circleMarker(r.coord, {
+    radius: size,
+    fillColor: color,
+    color: '#fff',
+    weight: 1.5,
+    fillOpacity: 0.95,
+    bubblingMouseEvents: false
+  }).addTo(map);
+
+  // 点击：弹 popup + 同步高亮列表
+  marker.on('click', () => activate(i));
+
+  // hover：放大，离开恢复
+  marker.on('mouseover', () => marker.setStyle({ radius: size + 3, weight: 2.5 }));
+  marker.on('mouseout',  () => marker.setStyle({ radius: size,     weight: 1.5 }));
+
+  // 序号 label，也支持点击（pointer-events 默认 auto）
+  const label = L.marker(r.coord, {
+    icon: L.divIcon({
+      className: 'num-label',
+      html: `<div>${i}</div>`,
+      iconSize: [22, 18],
+      iconAnchor: [11, 9]
+    }),
+    interactive: true,
+    keyboard: false
+  }).addTo(map);
+
+  label.on('click', () => activate(i));
+
+  markers.push(marker);
+  numberLabels.push(label);
+});
+
+// === 全局交互函数（供 popup 内按钮调用） ===
+let currentIndex = -1;
+
+window.activate = function(i) {
+  if (i < 0 || i >= route.length) return;
+  currentIndex = i;
+  const r = route[i];
+
+  // 弹 popup
+  markers[i].setPopupContent(buildPopupHtml(r, i));
+  markers[i].openPopup();
+
+  // 同步右侧列表高亮 + 滚动到可见
+  document.querySelectorAll('#list li').forEach((el, idx) => {
+    if (idx === i) {
+      el.classList.add('active');
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      el.classList.remove('active');
+    }
+  });
+};
+
+window.goTo = function(i) {
+  map.setView(route[i].coord, Math.max(map.getZoom(), 7), { animate: true });
+  setTimeout(() => activate(i), 300);
+};
+
+window.zoomTo = function(i, zoom) {
+  map.setView(route[i].coord, zoom, { animate: true });
+};
+
+window.copyCoord = function(lat, lng) {
+  const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('已复制坐标：' + text);
+    });
+  } else {
+    prompt('复制坐标：', text);
+  }
+};
+
+// 初始绑定空 popup（点击时再生成内容，保证导航按钮永远是最新的）
+markers.forEach((m, i) => m.bindPopup('', { maxWidth: 320, autoPan: true }));
+
+// 键盘左右箭头切换站点
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' && currentIndex < route.length - 1) goTo(currentIndex + 1);
+  if (e.key === 'ArrowLeft'  && currentIndex > 0)               goTo(currentIndex - 1);
+});
+
+/* ============================================================
+   活动节点管理（电商节 / 开幕 / 东南西北打卡 / 收官 等）
+   ============================================================ */
+
+// 默认活动数据（日期固定，可通过编辑器修改）
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+const defaultEvents = [
+  // 开幕仪式
+  { id:'ev-kickoff', name:'环华骑行开幕仪式', date:'2026-05-22', type:'开幕仪式',
+    location:'深圳出发地', coord:[22.5431,114.0579], emoji:'🚩', color:'#e74c3c',
+    desc:'品牌方+主播+媒体到场，全网同步直播，发出第一张续航实测海报',
+    link:''
+  },
+  // 东南西北四个角打卡
+  { id:'ev-east', name:'东极打卡 · 黑龙江抚远', date:'2026-08-20', type:'打卡',
+    location:'黑龙江抚远东极阁', coord:[48.3683,134.2902], emoji:'🌅', color:'#3498db',
+    desc:'中国最东点，抢"东极第一缕阳光"流量话题',
+    link:''
+  },
+  { id:'ev-south', name:'南极打卡 · 海南天涯海角', date:'2026-10-09', type:'打卡',
+    location:'海南三亚天涯海角', coord:[18.2997,109.3478], emoji:'🌴', color:'#16a085',
+    desc:'中国最南端，环华完美收官前的最南打卡',
+    link:''
+  },
+  { id:'ev-west', name:'西极打卡 · 新疆乌恰', date:'2026-07-18', type:'打卡',
+    location:'新疆乌恰县斯姆哈纳村', coord:[39.6864,73.9258], emoji:'🌄', color:'#9b59b6',
+    desc:'中国最西端，"全国最晚日落"地标，西北段最强地理话题',
+    link:''
+  },
+  { id:'ev-north', name:'北极打卡 · 漠河北极村', date:'2026-08-22', type:'打卡',
+    location:'黑龙江漠河北极村', coord:[53.4836,122.3522], emoji:'❄️', color:'#2980b9',
+    desc:'中国最北端，严寒电池实测核心场景',
+    link:''
+  },
+  // 电商节
+  { id:'ev-618', name:'618 大促主直播日', date:'2026-06-18', type:'电商节',
+    location:'广西崇左 / 移动直播间', coord:[22.4042,107.3537], emoji:'🛒', color:'#ff5722',
+    desc:'首个电商大节，路上骑行直播+晚间专场，主推 72-114 套餐，承诺敢回购',
+    link:''
+  },
+  { id:'ev-double11', name:'双 11 全网爆发日', date:'2026-11-11', type:'电商节',
+    location:'终点深圳 / 大本营', coord:[22.5431,114.0579], emoji:'🎁', color:'#e91e63',
+    desc:'全程素材集中复盘+全网投流+直播间 24 小时不间断，年度 GMV 峰值',
+    link:''
+  },
+  // 收官
+  { id:'ev-final', name:'环华收官仪式', date:'2026-10-04', type:'收官仪式',
+    location:'深圳出发地', coord:[22.5431,114.0579], emoji:'🏁', color:'#c0392b',
+    desc:'全网直播+纪录片首映+回购承诺兑现现场+老用户答谢',
+    link:''
+  }
+];
+
+const EMOJI_LIST = ['🚩','🏁','🛒','🎁','🛵','🎬','🔋','🌅','🌄','🌴','❄️','🏔️','🏖️','🏯','🎤','📺','💰','🎉','🚀','🏆','⛰️','🌊'];
+const COLOR_LIST = ['#ff6b35','#e74c3c','#ff5722','#e91e63','#9b59b6','#3498db','#2980b9','#16a085','#27ae60','#f39c12','#c0392b','#34495e'];
+
+const STORAGE_KEY = 'huanhua_events_v2';
+let events = [];
+let eventLayers = {}; // id -> marker
+
+function loadEvents() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { events = JSON.parse(raw); return; } catch (e) {}
+  }
+  events = JSON.parse(JSON.stringify(defaultEvents));
+  saveEvents();
+}
+function saveEvents() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+}
+
+// 把 WGS84 坐标转一次到 GCJ02 用于地图显示，源数据保持原样以便编辑
+function eventLatLng(ev) { return wgs84ToGcj02(ev.coord[0], ev.coord[1]); }
+
+// 渲染地图上的活动 marker
+function renderEventMarkers() {
+  Object.values(eventLayers).forEach(m => map.removeLayer(m));
+  eventLayers = {};
+  events.forEach(ev => {
+    const latlng = eventLatLng(ev);
+    const html = `
+      <div class="pin" style="background:${ev.color}">
+        <span class="emoji">${ev.emoji}</span>
+      </div>`;
+    const marker = L.marker(latlng, {
+      icon: L.divIcon({
+        className: 'event-marker',
+        html, iconSize: [40, 40], iconAnchor: [20, 38]
+      }),
+      zIndexOffset: 1000
+    }).addTo(map);
+    marker.bindPopup(buildEventPopup(ev), { maxWidth: 320 });
+    marker.on('click', () => {
+      // 同步右侧高亮
+      switchTab('event');
+      document.querySelectorAll('#eventList li').forEach(el => {
+        el.classList.toggle('active', el.dataset.id === ev.id);
+        if (el.dataset.id === ev.id) el.scrollIntoView({behavior:'smooth', block:'nearest'});
+      });
+    });
+    eventLayers[ev.id] = marker;
+  });
+}
+
+function buildEventPopup(ev) {
+  const linkHtml = ev.link ? `<div class="meta-row">🔗 <a href="${ev.link}" target="_blank" rel="noopener">查看链接</a></div>` : '';
+  return `
+    <div class="pop">
+      <div class="title">
+        <span class="day-badge" style="background:${ev.color}">${ev.type}</span>
+        <b>${ev.emoji} ${ev.name}</b>
+      </div>
+      <div class="meta-row">📅 ${ev.date}</div>
+      <div class="meta-row">📍 ${ev.location}</div>
+      ${linkHtml}
+      <div class="note">${ev.desc || '暂无描述'}</div>
+      <div class="actions">
+        <button onclick="editEvent('${ev.id}')">✏️ 编辑</button>
+        <button onclick="deleteEvent('${ev.id}')">🗑 删除</button>
+      </div>
+    </div>
+  `;
+}
+
+// 渲染右侧事件列表
+function renderEventList() {
+  const ul = document.getElementById('eventList');
+  ul.innerHTML = '';
+  // 按日期升序
+  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+  sorted.forEach(ev => {
+    const li = document.createElement('li');
+    li.dataset.id = ev.id;
+    li.innerHTML = `
+      <div class="ev-emoji">${ev.emoji}</div>
+      <div class="ev-body">
+        <div class="ev-name">${ev.name} <span class="ev-tag" style="background:${ev.color}33;color:${ev.color}">${ev.type}</span></div>
+        <div class="ev-when">📅 ${ev.date}</div>
+        <div class="ev-loc">📍 ${ev.location}</div>
+        ${ev.desc ? `<div class="ev-desc">${ev.desc}</div>` : ''}
+      </div>
+      <div class="ev-actions">
+        <button title="编辑" data-act="edit">✏️</button>
+        <button title="删除" data-act="del">🗑</button>
+      </div>
+    `;
+    li.addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (act === 'edit') { editEvent(ev.id); return; }
+      if (act === 'del')  { deleteEvent(ev.id); return; }
+      // 默认：飞到地图上对应点
+      map.setView(eventLatLng(ev), 8, { animate: true });
+      eventLayers[ev.id]?.openPopup();
+      document.querySelectorAll('#eventList li').forEach(el => el.classList.remove('active'));
+      li.classList.add('active');
+    });
+    ul.appendChild(li);
+  });
+  document.getElementById('evCount').textContent = `(${events.length})`;
+}
+
+// ============== Tab 切换 ==============
+function switchTab(name) {
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.getElementById('tab-route').style.display = name === 'route' ? '' : 'none';
+  document.getElementById('tab-event').style.display = name === 'event' ? '' : 'none';
+}
+document.querySelectorAll('.tabs .tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+// ============== 编辑器 ==============
+const modal = document.getElementById('modalMask');
+let editingId = null;
+
+function buildEmojiPicker() {
+  const box = document.getElementById('emojiPicker');
+  box.innerHTML = '';
+  EMOJI_LIST.forEach(e => {
+    const span = document.createElement('span');
+    span.textContent = e;
+    span.addEventListener('click', () => {
+      document.querySelectorAll('#emojiPicker span').forEach(s => s.classList.remove('selected'));
+      span.classList.add('selected');
+      document.getElementById('evEmoji').value = e;
+    });
+    box.appendChild(span);
+  });
+}
+function buildColorPicker() {
+  const box = document.getElementById('colorPicker');
+  box.innerHTML = '';
+  COLOR_LIST.forEach(c => {
+    const span = document.createElement('span');
+    span.style.background = c;
+    span.addEventListener('click', () => {
+      document.querySelectorAll('#colorPicker span').forEach(s => s.classList.remove('selected'));
+      span.classList.add('selected');
+      document.getElementById('evColor').value = c;
+    });
+    box.appendChild(span);
+  });
+}
+buildEmojiPicker();
+buildColorPicker();
+
+function openEditor(ev) {
+  editingId = ev ? ev.id : null;
+  document.getElementById('modalTitle').textContent = ev ? '编辑活动节点' : '新增活动节点';
+  document.getElementById('evName').value = ev?.name || '';
+  document.getElementById('evDate').value = ev?.date || isoDate(new Date());
+  document.getElementById('evType').value = ev?.type || '电商节';
+  document.getElementById('evLocation').value = ev?.location || '';
+  document.getElementById('evLat').value = ev?.coord?.[0] ?? '';
+  document.getElementById('evLng').value = ev?.coord?.[1] ?? '';
+  document.getElementById('evDesc').value = ev?.desc || '';
+  document.getElementById('evLink').value = ev?.link || '';
+  document.getElementById('evEmoji').value = ev?.emoji || '🎉';
+  document.getElementById('evColor').value = ev?.color || '#ff6b35';
+
+  // 高亮当前 emoji / color
+  document.querySelectorAll('#emojiPicker span').forEach(s => {
+    s.classList.toggle('selected', s.textContent === (ev?.emoji || '🎉'));
+  });
+  document.querySelectorAll('#colorPicker span').forEach(s => {
+    s.classList.toggle('selected', s.style.backgroundColor && rgbToHex(s.style.backgroundColor) === (ev?.color || '#ff6b35').toLowerCase());
+  });
+
+  document.getElementById('modalDeleteBtn').style.display = ev ? '' : 'none';
+  modal.classList.add('show');
+}
+function rgbToHex(rgb) {
+  const m = rgb.match(/\d+/g);
+  if (!m) return '';
+  return '#' + m.slice(0,3).map(x => parseInt(x).toString(16).padStart(2,'0')).join('');
+}
+function closeEditor() {
+  modal.classList.remove('show');
+  editingId = null;
+  cancelMapPick();
+}
+
+document.getElementById('modalCancelBtn').addEventListener('click', closeEditor);
+document.getElementById('modalCloseX').addEventListener('click', closeEditor);
+// 点遮罩外层关闭，但点击弹窗本体不关闭
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) closeEditor();
+});
+document.getElementById('modalSaveBtn').addEventListener('click', () => {
+  const data = {
+    name: document.getElementById('evName').value.trim(),
+    date: document.getElementById('evDate').value,
+    type: document.getElementById('evType').value,
+    location: document.getElementById('evLocation').value.trim(),
+    coord: [
+      parseFloat(document.getElementById('evLat').value),
+      parseFloat(document.getElementById('evLng').value)
+    ],
+    desc: document.getElementById('evDesc').value.trim(),
+    link: document.getElementById('evLink').value.trim(),
+    emoji: document.getElementById('evEmoji').value || '🎉',
+    color: document.getElementById('evColor').value || '#ff6b35'
+  };
+  if (!data.name || !data.date || !data.location || isNaN(data.coord[0]) || isNaN(data.coord[1])) {
+    alert('请填写必填项：名称、日期、地点、坐标'); return;
+  }
+  if (editingId) {
+    const idx = events.findIndex(e => e.id === editingId);
+    events[idx] = { ...events[idx], ...data };
+  } else {
+    data.id = 'ev-' + Date.now();
+    events.push(data);
+  }
+  saveEvents();
+  renderEventMarkers();
+  renderEventList();
+  closeEditor();
+});
+document.getElementById('modalDeleteBtn').addEventListener('click', () => {
+  if (!editingId) return;
+  if (!confirm('确认删除这个活动节点？')) return;
+  events = events.filter(e => e.id !== editingId);
+  saveEvents(); renderEventMarkers(); renderEventList();
+  closeEditor();
+});
+
+window.editEvent = function(id) {
+  const ev = events.find(e => e.id === id);
+  if (ev) openEditor(ev);
+};
+window.deleteEvent = function(id) {
+  if (!confirm('确认删除这个活动节点？')) return;
+  events = events.filter(e => e.id !== id);
+  saveEvents(); renderEventMarkers(); renderEventList();
+};
+
+document.getElementById('addEventBtn').addEventListener('click', () => openEditor(null));
+
+// ============== 在地图上点击选位 ==============
+const pickBanner = document.getElementById('pickBanner');
+let pickActive = false;
+function startMapPick() {
+  pickActive = true;
+  pickBanner.classList.add('show');
+  document.getElementById('map').classList.add('picking');
+  document.getElementById('pickOnMap').classList.add('active');
+  document.getElementById('pickOnMap').textContent = '正在选位… 点击地图任意位置 (Esc 取消)';
+}
+function cancelMapPick() {
+  pickActive = false;
+  pickBanner.classList.remove('show');
+  document.getElementById('map').classList.remove('picking');
+  document.getElementById('pickOnMap').classList.remove('active');
+  document.getElementById('pickOnMap').textContent = '📍 在地图上点击选位';
+}
+document.getElementById('pickOnMap').addEventListener('click', () => {
+  if (pickActive) cancelMapPick(); else startMapPick();
+});
+map.on('click', (e) => {
+  if (!pickActive) return;
+  // GCJ02 -> WGS84 反向（近似一次迭代即可）
+  const [lat, lng] = gcj02ToWgs84(e.latlng.lat, e.latlng.lng);
+  document.getElementById('evLat').value = lat.toFixed(6);
+  document.getElementById('evLng').value = lng.toFixed(6);
+  cancelMapPick();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (pickActive) { cancelMapPick(); return; }
+  if (modal.classList.contains('show')) { closeEditor(); }
+});
+function gcj02ToWgs84(lat, lng) {
+  const out = wgs84ToGcj02(lat, lng);
+  const dLat = out[0] - lat, dLng = out[1] - lng;
+  return [lat - dLat, lng - dLng];
+}
+
+// ============== 导入 / 导出 ==============
+document.getElementById('exportEventBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `环华骑行活动_${isoDate(new Date())}.json`;
+  a.click(); URL.revokeObjectURL(url);
+});
+document.getElementById('importEventBtn').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error('文件格式错误');
+      if (confirm(`将导入 ${data.length} 个活动，是否替换当前所有活动？\n点"取消"则会与当前活动合并。`)) {
+        events = data;
+      } else {
+        events = events.concat(data.map(d => ({...d, id: d.id || 'ev-'+Date.now()+Math.random()})));
+      }
+      saveEvents(); renderEventMarkers(); renderEventList();
+      alert('导入完成');
+    } catch (err) { alert('导入失败：' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// 初始化：加载本地活动并渲染
+loadEvents();
+renderEventMarkers();
+renderEventList();
+
+// 缩放控制：放大才显示序号
+function toggleNumberLabels() {
+  const show = map.getZoom() >= 6;
+  numberLabels.forEach(l => {
+    const el = l.getElement();
+    if (el) el.style.display = show ? 'block' : 'none';
+  });
+}
+map.on('zoomend', toggleNumberLabels);
+setTimeout(toggleNumberLabels, 200);
+
+// 适配视图到所有点
+map.fitBounds(L.latLngBounds(latlngs).pad(0.05));
+
+// 侧边栏列表
+const list = document.getElementById('list');
+route.forEach((r, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `
+    <span class="day">${r.day}</span>
+    <span class="route">${i === 0 ? '' : route[i-1].name + ' → '}${r.name}</span>
+    <span class="meta">${r.dist} km · ${r.note}</span>
+  `;
+  li.addEventListener('click', () => goTo(i));
+  list.appendChild(li);
+});
+</script>
+</body>
+</html>
